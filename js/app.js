@@ -104,12 +104,15 @@ document.addEventListener('DOMContentLoaded', function () {
       activeSketch = null;
     }
     
-    // Clear shared trails
+    // Clear shared trails and gesture tracker
     if (typeof clearFingertipTrails === 'function') {
       clearFingertipTrails();
     }
     if (typeof resetFaceGlow === 'function') {
       resetFaceGlow();
+    }
+    if (typeof gestureTracker !== 'undefined') {
+      gestureTracker.clear();
     }
     
     showElement(menuScreen);
