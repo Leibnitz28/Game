@@ -89,9 +89,9 @@ function createPlantSketch(containerElement) {
         p.push();
         p.translate(p.width, 0);
         p.scale(-1, 1);
-        p.colorMode(p.RGB);
-        p.tint(255, 60); // Faint background
-        p.image(video, 0, 0, p.width, p.height);
+        p.drawingContext.globalAlpha = 60 / 255;
+        p.drawingContext.drawImage(video, 0, 0, p.width, p.height);
+        p.drawingContext.globalAlpha = 1.0;
         p.pop();
       } else {
         p.background(0); // Fallback

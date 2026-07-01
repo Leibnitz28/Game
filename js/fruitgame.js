@@ -185,8 +185,9 @@ function createFruitGameSketch(containerElement, initialDifficulty) {
         p.push();
         p.translate(p.width, 0);
         p.scale(-1, 1);
-        p.tint(255, 40);
-        p.image(video, 0, 0, p.width, p.height);
+        p.drawingContext.globalAlpha = 40 / 255;
+        p.drawingContext.drawImage(video, 0, 0, p.width, p.height);
+        p.drawingContext.globalAlpha = 1.0;
         p.pop();
       }
     }
