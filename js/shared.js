@@ -34,7 +34,6 @@ let _cameraInstance = null;
 let _cameraStarted = false;
 let _cameraFrameCount = 0;
 let _videoElement = null;
-let _onFirstHandResult = null; // one-shot callback for first successful hand result
 
 // ===== LANDMARK INDEX CONSTANTS =====
 const LM = {
@@ -400,12 +399,6 @@ function initHands() {
     handsData.timestamp = performance.now();
 
     debugLog('handsData stored:', handsData.landmarks.length, 'hand(s)');
-
-    // Fire one-shot first-result callback
-    if (_onFirstHandResult) {
-      _onFirstHandResult();
-      _onFirstHandResult = null;
-    }
   });
 
   return _handsInstance;
@@ -453,7 +446,6 @@ function initCamera(videoEl, onReady) {
   }
 
   _videoElement = videoEl;
-  if (onReady) _onFirstHandResult = onReady;
 
   var hands = initHands();
   var face = initFaceDetection();
@@ -479,6 +471,7 @@ function initCamera(videoEl, onReady) {
     .then(function () {
       _cameraStarted = true;
       debugLog('Camera started successfully');
+      if (onReady) onReady();
     })
     .catch(function (err) {
       console.error('Camera start failed:', err);
