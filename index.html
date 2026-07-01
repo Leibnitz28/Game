@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hand Gesture Playground — Grow Plants & Slice Fruits with Your Hands</title>
+  <meta name="description" content="An interactive hand-gesture-controlled experience using your webcam. Grow magical plants or slice falling fruits — no touch needed, just your hands." />
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- p5.js -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Hidden video element for camera feed -->
+  <video id="camera-video" autoplay playsinline muted style="display:none;"></video>
+
+  <!-- ===== HOME MENU SCREEN ===== -->
+  <div id="menu-screen" class="screen">
+    <div class="menu-content">
+      <div class="menu-header">
+        <h1 class="menu-title">
+          <span class="title-icon">✋</span>
+          Hand Gesture Playground
+        </h1>
+        <p class="menu-subtitle">Control everything with just your hands — no touch needed</p>
+      </div>
+      <div class="card-container">
+        <button id="btn-plant" class="experience-card plant-card">
+          <span class="card-emoji">🌱</span>
+          <span class="card-title">Grow a Plant</span>
+          <span class="card-desc">Use hand gestures to grow, bloom, and color a magical tree</span>
+        </button>
+        <button id="btn-fruitgame" class="experience-card fruit-card">
+          <span class="card-emoji">🍉</span>
+          <span class="card-title">Slice Fruits</span>
+          <span class="card-desc">Slash falling fruits with dual hand blades in endless mode</span>
+        </button>
+      </div>
+      <p class="menu-hint">📷 Camera access required — allow when prompted</p>
+    </div>
+  </div>
+
+  <!-- ===== PLANT EXPERIENCE SCREEN ===== -->
+  <div id="plant-screen" class="screen experience-screen hidden">
+    <div id="plant-canvas-container" class="canvas-container"></div>
+    <div class="experience-controls">
+      <button id="plant-back" class="back-btn" aria-label="Back to Menu">
+        <span class="btn-icon">←</span> Menu
+      </button>
+      <button id="plant-snapshot" class="action-btn snapshot-btn" aria-label="Save Snapshot">
+        📸 Snapshot
+      </button>
+    </div>
+    <div id="plant-hand-hint" class="hand-hint hidden">
+      <span>👋</span> Show your hand to begin
+    </div>
+  </div>
+
+  <!-- ===== FRUIT GAME EXPERIENCE SCREEN ===== -->
+  <div id="fruitgame-screen" class="screen experience-screen hidden">
+    <div id="fruitgame-canvas-container" class="canvas-container"></div>
+    <div class="experience-controls">
+      <button id="fruitgame-back" class="back-btn" aria-label="Back to Menu">
+        <span class="btn-icon">←</span> Menu
+      </button>
+      <button id="fruitgame-difficulty-btn" class="action-btn difficulty-toggle-btn" aria-label="Change Difficulty">
+        ⚙️ Difficulty
+      </button>
+    </div>
+    <div id="fruitgame-hand-hint" class="hand-hint hidden">
+      <span>👋</span> Show your hands to slice
+    </div>
+  </div>
+
+  <!-- ===== LOADING OVERLAY ===== -->
+  <div id="loading-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <div class="spinner"></div>
+      <p class="loading-text">Starting camera & loading models…</p>
+      <p class="loading-subtext">This may take a few seconds on first load</p>
+    </div>
+  </div>
+
+  <!-- ===== ERROR OVERLAY ===== -->
+  <div id="error-overlay" class="overlay hidden">
+    <div class="overlay-content error-content">
+      <span class="error-icon">⚠️</span>
+      <p class="error-text">Camera access denied or unavailable</p>
+      <p class="error-subtext">Please allow camera access in your browser settings and reload the page.</p>
+      <button id="error-retry" class="action-btn" onclick="location.reload()">🔄 Retry</button>
+    </div>
+  </div>
+
+  <!-- App Scripts (order matters) -->
+  <script src="js/shared.js"></script>
+  <script src="js/plant.js"></script>
+  <script src="js/fruitgame.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
