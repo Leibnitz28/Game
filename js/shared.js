@@ -470,6 +470,7 @@ function initCamera(videoEl, onReady) {
         await face.send({ image: videoEl });
       }
     },
+    facingMode: 'user',
     width: 640,
     height: 480
   });
