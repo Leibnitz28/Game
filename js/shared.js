@@ -69,8 +69,63 @@ function toCanvasY(normalizedY, canvasHeight) {
   return normalizedY * canvasHeight;
 }
 
-// ===== GESTURE DETECTION HELPERS =====
-// All take a single hand's landmarks array (21 {x,y,z} objects, normalized).
+// ===== TEMPORAL GESTURE TRACKER =====
+class GestureTracker {
+  constructor(bufferSize = 8) {
+    this.bufferSize = bufferSize;
+    // Store history per hand (Left, Right) and per gesture
+    this.history = { Left: {}, Right: {} };
+    this.state = { Left: {}, Right: {} };
+  }
+
+  // handLabel: "Left" or "Right"
+  // gestureName: string (e.g. "fist", "thumbsUp")
+  // rawValue: boolean (is it detected this frame?)
+  // thresholdOn: number (e.g. 6/8 frames to turn ON)
+  // thresholdOff: number (e.g. 6/8 frames to turn OFF)
+  update(handLabel, gestureName, rawValue, thresholdOn = 6, thresholdOff = 6) {
+    if (!this.history[handLabel][gestureName]) {
+      this.history[handLabel][gestureName] = [];
+      this.state[handLabel][gestureName] = false;
+    }
+    
+    const hist = this.history[handLabel][gestureName];
+    hist.push(rawValue);
+    if (hist.length > this.bufferSize) {
+      hist.shift();
+    }
+
+    // Only evaluate if buffer is full
+    if (hist.length === this.bufferSize) {
+      const positiveCount = hist.filter(v => v).length;
+      const negativeCount = this.bufferSize - positiveCount;
+      const currentState = this.state[handLabel][gestureName];
+
+      if (!currentState && positiveCount >= thresholdOn) {
+        this.state[handLabel][gestureName] = true;
+      } else if (currentState && negativeCount >= thresholdOff) {
+        this.state[handLabel][gestureName] = false;
+      }
+    }
+    
+    return this.state[handLabel][gestureName];
+  }
+
+  get(handLabel, gestureName) {
+    return this.state[handLabel]?.[gestureName] || false;
+  }
+  
+  clear() {
+    this.history = { Left: {}, Right: {} };
+    this.state = { Left: {}, Right: {} };
+  }
+}
+
+const gestureTracker = new GestureTracker(8);
+
+
+// ===== GESTURE DETECTION HELPERS (Using World Landmarks) =====
+// All take a single hand's WORLD landmarks array (21 {x,y,z} objects, in physical meters).
 
 /** Euclidean distance between two landmark points (3D). */
 function _dist3D(a, b) {
@@ -80,82 +135,95 @@ function _dist3D(a, b) {
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-/** Euclidean distance between two landmark points (2D, ignoring z). */
-function _dist2D(a, b) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 /**
- * Check if a specific finger is extended.
- * @param {Array} landmarks - 21-point hand landmarks
- * @param {number} fingerIndex - 0=thumb, 1=index, 2=middle, 3=ring, 4=pinky
- * @returns {boolean}
+ * Check if a specific finger is extended, using distance from wrist.
  */
-function isFingerExtended(landmarks, fingerIndex) {
+function isFingerExtended(worldLandmarks, fingerIndex, currentState = false) {
   if (fingerIndex === 0) {
     // Thumb: tip is farther from wrist than the IP joint
-    const tipDist = _dist2D(landmarks[LM.THUMB_TIP], landmarks[LM.WRIST]);
-    const ipDist = _dist2D(landmarks[LM.THUMB_IP], landmarks[LM.WRIST]);
-    return tipDist > ipDist * 1.1; // 10% margin for stability
+    const tipDist = _dist3D(worldLandmarks[LM.THUMB_TIP], worldLandmarks[LM.WRIST]);
+    const ipDist = _dist3D(worldLandmarks[LM.THUMB_IP], worldLandmarks[LM.WRIST]);
+    const multiplier = currentState ? 1.05 : 1.15; 
+    return tipDist > ipDist * multiplier;
   }
-  // Other fingers: tip is above (lower y) the PIP joint
+  
+  // Other fingers: compare tip-to-wrist distance vs pip-to-wrist distance
   const tipIndices = [0, LM.INDEX_TIP, LM.MIDDLE_TIP, LM.RING_TIP, LM.PINKY_TIP];
   const pipIndices = [0, LM.INDEX_PIP, LM.MIDDLE_PIP, LM.RING_PIP, LM.PINKY_PIP];
-  return landmarks[tipIndices[fingerIndex]].y < landmarks[pipIndices[fingerIndex]].y;
+  
+  const tipDist = _dist3D(worldLandmarks[tipIndices[fingerIndex]], worldLandmarks[LM.WRIST]);
+  const pipDist = _dist3D(worldLandmarks[pipIndices[fingerIndex]], worldLandmarks[LM.WRIST]);
+  
+  // Hysteresis: Easier to stay open than to open initially
+  const multiplier = currentState ? 1.1 : 1.25;
+  return tipDist > pipDist * multiplier;
 }
 
 /** Count how many fingers are extended (0-5). */
-function countExtendedFingers(landmarks) {
+function countExtendedFingers(worldLandmarks) {
   let count = 0;
   for (let i = 0; i < 5; i++) {
-    if (isFingerExtended(landmarks, i)) count++;
+    if (isFingerExtended(worldLandmarks, i)) count++;
   }
   return count;
 }
 
 /** All fingers curled (no fingers extended). */
-function isFist(landmarks) {
-  return countExtendedFingers(landmarks) === 0;
+function isFist(worldLandmarks, currentState = false) {
+  const count = countExtendedFingers(worldLandmarks);
+  if (currentState) {
+    return count <= 1; // Exit fist if 2 or more fingers open
+  } else {
+    return count === 0; // Enter fist only if 0 fingers open
+  }
 }
 
 /**
  * Thumbs up: thumb extended and pointing upward, all other fingers curled.
  */
-function isThumbsUp(landmarks) {
-  if (!isFingerExtended(landmarks, 0)) return false;
+function isThumbsUp(worldLandmarks, currentState = false) {
+  const thumbExt = isFingerExtended(worldLandmarks, 0);
+  let otherExt = 0;
   for (let i = 1; i < 5; i++) {
-    if (isFingerExtended(landmarks, i)) return false;
+    if (isFingerExtended(worldLandmarks, i)) otherExt++;
   }
-  // Verify thumb is actually pointing upward (tip.y significantly above MCP.y)
-  return landmarks[LM.THUMB_TIP].y < landmarks[LM.THUMB_MCP].y - 0.03;
+  
+  // Y-axis in world coords: negative is UP relative to hand center
+  const isUp = worldLandmarks[LM.THUMB_TIP].y < worldLandmarks[LM.THUMB_MCP].y - 0.01;
+  
+  if (currentState) {
+    return thumbExt && otherExt <= 1 && isUp;
+  } else {
+    return thumbExt && otherExt === 0 && isUp;
+  }
 }
 
-/** Raw distance between thumb tip and index fingertip. */
-function getPinchDistance(landmarks) {
-  return _dist3D(landmarks[LM.THUMB_TIP], landmarks[LM.INDEX_TIP]);
+/** Raw distance between thumb tip and index fingertip in meters. */
+function getPinchDistance(worldLandmarks) {
+  return _dist3D(worldLandmarks[LM.THUMB_TIP], worldLandmarks[LM.INDEX_TIP]);
 }
 
-/** Pinch detected when thumb-index distance is below threshold. */
-function isPinch(landmarks, threshold) {
-  if (threshold === undefined) threshold = 0.06;
-  return getPinchDistance(landmarks) < threshold;
+/** Pinch detected when thumb-index distance is below physical threshold. */
+function isPinch(worldLandmarks, currentState = false) {
+  // 0.02 meters = 2cm. Hysteresis to 3cm.
+  const threshold = currentState ? 0.03 : 0.02;
+  return getPinchDistance(worldLandmarks) < threshold;
 }
 
 /**
- * Finger spread: average distance between adjacent fingertips, normalized 0-1.
- * 0 = fingers together, 1 = fully spread.
+ * Finger spread: average distance between adjacent fingertips.
+ * Normalized 0-1 based on typical physical hand size in meters.
  */
-function getSpread(landmarks) {
+function getSpread(worldLandmarks) {
   const tips = [LM.THUMB_TIP, LM.INDEX_TIP, LM.MIDDLE_TIP, LM.RING_TIP, LM.PINKY_TIP];
   let totalDist = 0;
   for (let i = 0; i < tips.length - 1; i++) {
-    totalDist += _dist3D(landmarks[tips[i]], landmarks[tips[i + 1]]);
+    totalDist += _dist3D(worldLandmarks[tips[i]], worldLandmarks[tips[i + 1]]);
   }
   const avgDist = totalDist / (tips.length - 1);
-  // Normalize: ~0.03 closed, ~0.14 fully spread
-  return Math.min(1, Math.max(0, (avgDist - 0.03) / 0.11));
+  
+  // Normalize: ~0.015m closed, ~0.06m fully spread
+  return Math.min(1, Math.max(0, (avgDist - 0.015) / 0.045));
 }
 
 // ===== HOLOGRAM / HAND HUD RENDERER =====
@@ -264,7 +332,7 @@ function drawHandHUD(p, data, cw, ch) {
       }
     }
 
-    // --- Wrist pulse scan-ring ---
+    // --- Wrist pulse scan-ring & Calibration Dot ---
     const wx = toCanvasX(lm[LM.WRIST].x, cw);
     const wy = toCanvasY(lm[LM.WRIST].y, ch);
     const ring1 = 25 + Math.sin(_wristPulsePhase + h) * 12;
@@ -280,6 +348,16 @@ function drawHandHUD(p, data, cw, ch) {
     p.stroke(gc[0], gc[1], gc[2], ringAlpha2);
     p.strokeWeight(1.2);
     p.ellipse(wx, wy, ring2, ring2);
+
+    // Calibration Dot (confidence)
+    const score = data.handedness[h] ? data.handedness[h].score : 0;
+    let dotColor = [0, 255, 0]; // Green (High Confidence)
+    if (score < 0.7) dotColor = [255, 0, 0]; // Red
+    else if (score < 0.85) dotColor = [255, 200, 0]; // Yellow
+    
+    p.noStroke();
+    p.fill(dotColor[0], dotColor[1], dotColor[2], 200);
+    p.ellipse(wx, wy - 40, 8, 8); // Floating above wrist
 
     // Reset shadow
     p.drawingContext.shadowBlur = 0;
@@ -397,6 +475,48 @@ function initHands() {
     handsData.worldLandmarks = results.multiHandWorldLandmarks || [];
     handsData.image = results.image;
     handsData.timestamp = performance.now();
+    
+    // Update GestureTracker with debouncing & confidence gating
+    if (handsData.landmarks.length > 0) {
+      // Track which hands were seen this frame
+      const seenHands = new Set();
+      
+      for (let i = 0; i < handsData.landmarks.length; i++) {
+        const score = handsData.handedness[i].score;
+        const label = handsData.handedness[i].label; // 'Left' or 'Right'
+        seenHands.add(label);
+        
+        // Skip voting on very low confidence frames (noise rejection)
+        if (score < 0.75) continue;
+        
+        const worldLms = handsData.worldLandmarks[i];
+        
+        const fistRaw = isFist(worldLms, gestureTracker.get(label, 'fist'));
+        gestureTracker.update(label, 'fist', fistRaw, 5, 5); // 5/8 frames
+        
+        const thumbsUpRaw = isThumbsUp(worldLms, gestureTracker.get(label, 'thumbsUp'));
+        gestureTracker.update(label, 'thumbsUp', thumbsUpRaw, 5, 5);
+        
+        const pinchRaw = isPinch(worldLms, gestureTracker.get(label, 'pinch'));
+        gestureTracker.update(label, 'pinch', pinchRaw, 4, 5); // Faster pinch ON
+      }
+      
+      // Decay hands that are missing in this frame
+      for (const label of ['Left', 'Right']) {
+        if (!seenHands.has(label)) {
+          gestureTracker.update(label, 'fist', false);
+          gestureTracker.update(label, 'thumbsUp', false);
+          gestureTracker.update(label, 'pinch', false);
+        }
+      }
+    } else {
+      // No hands at all — decay all trackers to prevent stuck gestures
+      for (const label of ['Left', 'Right']) {
+        gestureTracker.update(label, 'fist', false);
+        gestureTracker.update(label, 'thumbsUp', false);
+        gestureTracker.update(label, 'pinch', false);
+      }
+    }
 
     debugLog('handsData stored:', handsData.landmarks.length, 'hand(s)');
   });

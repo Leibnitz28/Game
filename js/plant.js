@@ -149,9 +149,12 @@ function createPlantSketch(containerElement) {
       let rightHand = null;
       
       for (let i = 0; i < handsData.landmarks.length; i++) {
-        const label = handsData.handedness[i]?.label; // "Left" or "Right" (actual hand, not mirrored)
-        if (label === 'Left') leftHand = handsData.landmarks[i];
-        if (label === 'Right') rightHand = handsData.landmarks[i];
+        const label = handsData.handedness[i]?.label; // "Left" or "Right"
+        // Also grab world landmarks for distance math
+        const worldLms = handsData.worldLandmarks[i];
+        
+        if (label === 'Left') leftHand = { lm: handsData.landmarks[i], wlm: worldLms, label };
+        if (label === 'Right') rightHand = { lm: handsData.landmarks[i], wlm: worldLms, label };
       }
       
       // Fallback: if only one hand, it controls both
@@ -160,24 +163,23 @@ function createPlantSketch(containerElement) {
       
       // --- Left Hand: Grow (Wrist Y) ---
       if (leftHand && !resetTriggered) {
-        // wrist y: 0 (top) to 1 (bottom). Invert so hand up = grow
-        const rawY = 1.0 - leftHand[LM.WRIST].y; 
-        // Map 0.3-0.8 range to 0-1
+        // We still use screen landmarks (lm) for screen-relative Y position
+        const rawY = 1.0 - leftHand.lm[LM.WRIST].y; 
         targetGrow = p.constrain(p.map(rawY, 0.3, 0.8, 0, 1), 0, 1);
       }
       
       // --- Right Hand: Bloom (Spread) & Gestures ---
       if (rightHand && !resetTriggered) {
         
-        // Fist -> Reset
-        if (isFist(rightHand)) {
+        // Fist -> Reset (using debounced tracker)
+        if (gestureTracker.get(rightHand.label, 'fist')) {
           resetTriggered = true;
           activeGestureName = "Fist: Resetting!";
           return; // Skip other gestures
         }
         
-        // Thumbs Up -> Burst
-        const isTU = isThumbsUp(rightHand);
+        // Thumbs Up -> Burst (using debounced tracker)
+        const isTU = gestureTracker.get(rightHand.label, 'thumbsUp');
         if (isTU && !thumbsUpWasActive) {
           triggerFullBloomBurst();
           activeGestureName = "Burst!";
@@ -185,28 +187,31 @@ function createPlantSketch(containerElement) {
         thumbsUpWasActive = isTU;
         
         // Extended Fingers -> Density & Theme
-        if (!isTU) { // Don't count thumbs up as 1 finger for these
-          const fingers = countExtendedFingers(rightHand);
+        if (!isTU) {
+          // Use world landmarks for reliable finger counting
+          const fingers = countExtendedFingers(rightHand.wlm);
           if (fingers >= 0 && fingers <= 5) {
             branchDensityTarget = fingers;
             if (fingers > 0 && fingers < 5) {
                if (nextThemeIndex === themeIndex) {
-                 // Map 1-4 fingers to 0-3 theme index
                  nextThemeIndex = fingers - 1;
                }
             }
           }
         }
         
-        // Default Bloom via Spread
-        targetBloom = getSpread(rightHand);
+        // Default Bloom via Spread (world landmarks)
+        targetBloom = getSpread(rightHand.wlm);
       }
       
       // --- Either Hand: Pinch -> Hue ---
-      for (const lm of handsData.landmarks) {
-        if (isPinch(lm)) {
-          // Change hue based on x position
-          targetHue = p.map(lm[LM.WRIST].x, 0, 1, 0, 360);
+      // We check all detected hands for pinch using the tracker
+      for (let i = 0; i < handsData.landmarks.length; i++) {
+        const label = handsData.handedness[i]?.label;
+        if (gestureTracker.get(label, 'pinch')) {
+          // Screen landmark for X position to map to hue
+          const lx = handsData.landmarks[i][LM.WRIST].x;
+          targetHue = p.map(lx, 0, 1, 0, 360);
           activeGestureName = "Pinch: Coloring";
           break; // Only use first pinched hand
         }
@@ -226,11 +231,12 @@ function createPlantSketch(containerElement) {
           particles = [];
         }
       } else {
-        growAmount = p.lerp(growAmount, targetGrow, 0.1);
-        bloomAmount = p.lerp(bloomAmount, targetBloom, 0.1);
+        // Slower lerps for continuous smoothness on noisy mobile data
+        growAmount = p.lerp(growAmount, targetGrow, 0.05);
+        bloomAmount = p.lerp(bloomAmount, targetBloom, 0.05);
       }
       
-      branchDensity = p.lerp(branchDensity, branchDensityTarget, 0.05);
+      branchDensity = p.lerp(branchDensity, branchDensityTarget, 0.03);
       
       // Circular lerp for hue
       const dh = targetHue - plantHue;

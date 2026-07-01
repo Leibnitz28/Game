@@ -284,7 +284,7 @@ function createFruitGameSketch(containerElement, initialDifficulty) {
       const avgY = sumY / handCount; // 0 to 1
       // Map y:0.2 (high) -> 1.5x speed, y:0.8 (low) -> 0.5x speed
       const targetHeightMod = p.constrain(p.map(avgY, 0.8, 0.2, 0.5, 1.5), 0.5, 1.5);
-      handHeightModifier = p.lerp(handHeightModifier, targetHeightMod, 0.05);
+      handHeightModifier = p.lerp(handHeightModifier, targetHeightMod, 0.03);
       
       // Process Slicing per hand
       for (const side of ['left', 'right']) {
