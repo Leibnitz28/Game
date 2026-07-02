@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Hand Gesture Playground — Grow Plants & Slice Fruits with Your Hands</title>
-  <meta name="description" content="An interactive hand-gesture-controlled experience using your webcam. Grow magical plants or slice falling fruits — no touch needed, just your hands." />
+  <title>Hand Gesture Playground — 4 Interactive Hand-Controlled Experiences</title>
+  <meta name="description" content="An interactive hand-gesture-controlled experience using your webcam. Grow plants, slice fruits, draw in the air, or catch birds — no touch needed, just your hands." />
 
   <!-- Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,6 +50,16 @@
           <span class="card-title">Slice Fruits</span>
           <span class="card-desc">Slash falling fruits with dual hand blades in endless mode</span>
         </button>
+        <button id="btn-airdraw" class="experience-card airdraw-card">
+          <span class="card-emoji">✍️</span>
+          <span class="card-title">Air Draw</span>
+          <span class="card-desc">Draw in the air with your finger — neon pens, colors, and magic</span>
+        </button>
+        <button id="btn-birdcatch" class="experience-card birdcatch-card">
+          <span class="card-emoji">🐦</span>
+          <span class="card-title">Catch Birds</span>
+          <span class="card-desc">Reach out and grab flying birds with your hands</span>
+        </button>
       </div>
       <p class="menu-hint">📷 Camera access required — allow when prompted</p>
     </div>
@@ -87,6 +97,38 @@
     </div>
   </div>
 
+  <!-- ===== AIR DRAW EXPERIENCE SCREEN ===== -->
+  <div id="airdraw-screen" class="screen experience-screen hidden">
+    <div id="airdraw-canvas-container" class="canvas-container"></div>
+    <div class="experience-controls">
+      <button id="airdraw-back" class="back-btn" aria-label="Back to Menu">
+        <span class="btn-icon">←</span> Menu
+      </button>
+      <button id="airdraw-save" class="action-btn snapshot-btn" aria-label="Save Drawing">
+        💾 Save
+      </button>
+    </div>
+    <div id="airdraw-hand-hint" class="hand-hint hidden">
+      <span>✌️</span> Pinch right hand to draw, open left palm for tools
+    </div>
+  </div>
+
+  <!-- ===== BIRD CATCH EXPERIENCE SCREEN ===== -->
+  <div id="birdcatch-screen" class="screen experience-screen hidden">
+    <div id="birdcatch-canvas-container" class="canvas-container"></div>
+    <div class="experience-controls">
+      <button id="birdcatch-back" class="back-btn" aria-label="Back to Menu">
+        <span class="btn-icon">←</span> Menu
+      </button>
+      <button id="birdcatch-difficulty-btn" class="action-btn difficulty-toggle-btn" aria-label="Change Difficulty">
+        ⚙️ Difficulty
+      </button>
+    </div>
+    <div id="birdcatch-hand-hint" class="hand-hint hidden">
+      <span>✊</span> Grab birds with your fist
+    </div>
+  </div>
+
   <!-- ===== LOADING OVERLAY ===== -->
   <div id="loading-overlay" class="overlay hidden">
     <div class="overlay-content">
@@ -110,6 +152,8 @@
   <script src="js/shared.js"></script>
   <script src="js/plant.js"></script>
   <script src="js/fruitgame.js"></script>
+  <script src="js/airdraw.js"></script>
+  <script src="js/birdcatch.js"></script>
   <script src="js/app.js"></script>
   <!-- Menu Particle Canvas Animation -->
   <script>

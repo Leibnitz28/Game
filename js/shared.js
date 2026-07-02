@@ -226,6 +226,14 @@ function getSpread(worldLandmarks) {
   return Math.min(1, Math.max(0, (avgDist - 0.015) / 0.045));
 }
 
+/**
+ * Open hand detection: 3+ fingers extended.
+ * Used for bird-catch grab transition (open→fist) and air-draw tool summoning.
+ */
+function isOpenHand(worldLandmarks) {
+  return countExtendedFingers(worldLandmarks) >= 3;
+}
+
 // ===== HOLOGRAM / HAND HUD RENDERER =====
 
 // Fingertip trail history — ring buffers, capped at MAX_TRAIL_LENGTH
@@ -499,6 +507,9 @@ function initHands() {
         
         const pinchRaw = isPinch(worldLms, gestureTracker.get(label, 'pinch'));
         gestureTracker.update(label, 'pinch', pinchRaw, 4, 5); // Faster pinch ON
+        
+        const openRaw = isOpenHand(worldLms);
+        gestureTracker.update(label, 'openHand', openRaw, 4, 4); // Quick response
       }
       
       // Decay hands that are missing in this frame
@@ -507,6 +518,7 @@ function initHands() {
           gestureTracker.update(label, 'fist', false);
           gestureTracker.update(label, 'thumbsUp', false);
           gestureTracker.update(label, 'pinch', false);
+          gestureTracker.update(label, 'openHand', false);
         }
       }
     } else {
@@ -515,6 +527,7 @@ function initHands() {
         gestureTracker.update(label, 'fist', false);
         gestureTracker.update(label, 'thumbsUp', false);
         gestureTracker.update(label, 'pinch', false);
+        gestureTracker.update(label, 'openHand', false);
       }
     }
 
